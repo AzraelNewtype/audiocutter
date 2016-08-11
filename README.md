@@ -2,6 +2,12 @@
 
 A tool to cut audio and generate associated chapters/qpfiles for vapoursynth.
 
+## Known Issues
+
+* Putting 0 at the end of a trim will not work as expected. It probably will just print an error on the video stream
+that the trim is invalid, but it may not even do that much. If you want to go to the last frame, for the moment please
+specify that last frame number explicitly.
+
 ## API
 
 ### Functions
