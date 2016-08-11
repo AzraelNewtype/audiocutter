@@ -77,6 +77,9 @@ class AudioCutter(object):
         safe, msg = self.__list_of_lists(trims)
         if (not safe):
             return self.core.text.Text(vid, msg)
+        max = vid.num_frames
+        trims = list(map(lambda x: (x[0], x[1]) if x[1] > 0 else (x[0], max),
+                     trims))
         self.__trim_holder = trims
         valid, msg = self.__is_valid()
         if (not valid):
