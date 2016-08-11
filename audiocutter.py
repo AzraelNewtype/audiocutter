@@ -2,6 +2,7 @@ import glob
 import numbers
 import re
 import shlex
+import sys
 import vapoursynth as vs
 from fractions import Fraction
 from os.path import getsize, splitext
@@ -9,10 +10,10 @@ from os.path import getsize, splitext
 
 class AudioCutter(object):
     """A tool to cut audio and generate associated chapters/qpfiles for vapoursynth."""
-    
+
     def __init__(self):
         """Bog standard initialization. There are no possible arguments."""
-        
+
         # Easy, top of file spot for mkvmerge path. If the binary isn't in your PATH, edit
         # it here.
         self.__mkvmerge = r'mkvmerge'
@@ -26,55 +27,49 @@ class AudioCutter(object):
         self.__qp_lines = ''
         self.__chapters = ''
         self.chapter_names = []
-    
-    
+
     @property
     def chapters(self):
         """A string containing the lines for a chapter file."""
         return self.__chapters
-    
-    
+
     @property
     def chapter_names(self):
         """A list of strings to be used in the chapter output."""
         return self.__chapter_names
-    
-    
+
     @chapter_names.setter
     def chapter_names(self, names):
         self.__chapter_names = names
 
-        
     @property
     def cut_cmd(self):
         """The mkvmerge command(s) that will be called, to show the timecodes.
-        
+
         Do note that the actual cutting method modifies this further, though not
         the timecodes. If you just want to ensure that it's cutting in the right
         spot, this is fine after cut_audio()
-        
-        Note that this command will come with two format string variables, 
+
+        Note that this command will come with two format string variables,
         {0} for the input filename, and {1} for the output. cut_audio() handles
         this for you though.
         """
         return self.__cut_cmd
-        
 
     @property
     def qp_lines(self):
         return self.__qp_lines
 
-
     def split(self, vid, trims):
         """Takes a list of 2-tuples of frame numbers and returns the trimmed/spliced video.
-        
+
         The 2-tuples must have positive frame numbers, and the second member must be greater
         than the first. The end frame number is inclusive, like avisynth, but unlike standard
         slicing in vapoursynth. As a result, avisynth's:
             trim(9536,22662)++trim(25360,36238)++trim(38038,47896)
         is exactly analagous to:
             split(video_in, [(9536,22662),(25360,36238),(38038,47896)]
-        
+
         Fancy list slicing, inverse stride, skipping frames, and other similar tricks you can
         trivially pull with vapoursynth directly don't make much sense in this context, so they
         simply will not work.
@@ -90,33 +85,31 @@ class AudioCutter(object):
             self.__clip_holder.append(vid[clip[0]:clip[1]+1])
         self.__fps_num = vid.fps_num
         self.__fps_den = vid.fps_den
-        
+
         self.__prepare_audio_cut_lines(vid)
-        
+
         return self.core.std.Splice(self.__clip_holder)
-        
-    
+
     def cut_audio(self, outfile, video_source=None, audio_source=None):
         """Cuts the supplied audio file, based on trims from AudioCutter.split()
-        
+
         video_source is intended for use with a video type where you've either manually
         demuxed an audio track to the same name as your source (e.g. tsmuxer + LSMASHSource),
-        or generated an index file that demuxes the audio in a very similar way 
+        or generated an index file that demuxes the audio in a very similar way
         (e.g dgindex + d2v.Source). It will search for filenames that begin with the video name,
         but have an aac or ac3 extension, as these are the most likely output from those types
         of sources (DVDs/Transport streams). It always uses the largest available file, so don't
         use this option if for some reason you have ac3 and aac files that are similar to your
         source name, unless you're sure you want the ac3, as it will be bigger. This is mutually
         exclusive with audio_source.
-        
+
         audio_source simply takes an audio file name, in case your audio isn't so strictly named
         like your video. This is mutually exclusive with video_source.
-        
+
         outfile should be fairly straightforward.
         """
         from subprocess import check_output, call
-        from sys import exit, getfilesystemencoding
-        
+
         if video_source is None and audio_source is None:
             exit("You didn't supply any audio to cut")
         elif (video_source is not None) and (audio_source is not None):
@@ -127,77 +120,76 @@ class AudioCutter(object):
             aacs = glob.glob("{0}*.aac".format(splitext(video_source)[0]))
             ac3s = glob.glob("{0}*.ac3".format(splitext(video_source)[0]))
             potential_audio = aacs + ac3s
-            potential_audio.sort(key = lambda x: getsize(x), reverse=True)
+            potential_audio.sort(key=lambda x: getsize(x), reverse=True)
             if len(potential_audio) > 0:
                 afile = potential_audio[0]
             else:
-                exit('Cannot find audio file that matches given video file name')
-        
+                sys.exit('Cannot find audio file that matches given video file name')
+
         ident = check_output([self.__mkvmerge, "--identify-for-mmg", afile])
         identre = re.compile("Track ID (\d+): audio( \(AAC\) \[aac_is_sbr:true\])?")
-        ret = (identre.search(ident.decode(getfilesystemencoding())) if ident
-                else None)
+        ret = (identre.search(ident.decode(sys.getfilesystemencoding())) if ident
+               else None)
         tid = ret.group(1) if ret else '0'
         sbr = ("0:1" if ret.group(2) else "0:0"
-                if afile.endswith("aac") else "")
-        
+               if afile.endswith("aac") else "")
+
         delre = re.compile('DELAY ([-]?\d+)', flags=re.IGNORECASE)
         ret = delre.search(afile)
-        
+
         delay = '{0}:{1}'.format(tid, ret.group(1)) if ret else None
-        
+
         final_cut = self.__cut_cmd
         if delay:
             final_cut += " --sync {}".format(delay)
         if sbr:
             final_cut += " --aac-is-sbr {}".format(sbr)
-        
+
         self.__cut_cmd = final_cut
         args = shlex.split(final_cut.format(afile, outfile))
-        
+
         cutExec = call(args)
         if cutExec == 1:
             print("Mkvmerge exited with warnings: {0:d}".format(cutExec))
         elif cutExec == 2:
             exit("Failed to execute mkvmerge: {0:d}".format(cutExec))
-  
-    
+
     def ready_qp_and_chapters(self, vid):
         """Populates qp_lines and chapters based on frames passed to split()
-        
+
         This function is kept separate from split() in case of framerate change.
         The obvious use case is after inverse telecine, where this must be called
-        after decimation. 
-        
+        after decimation.
+
         The chapters created will be bog standard OGM chapters format, defaulting to
         Chapter NN for the names if chapter_names has not been set. Also, if there are
         more split points than names supplied, it will exhaust the list first and then
         start using the defaults.
-        
+
         The chapter timecodes are converted back from the qpfile cut frames, rather than
         separately like vfr.py used to for avisynth, largely because I don't even know
         how those timecodes came about, but also because this ensures a chapter jump will
         go to the exact spot with a forced IDR point. While this may not always be perfectly
         frame accurate in an ivtc context, having them match and be off by one is better than
-        potentially having the chapter IDR point one frame later than the chapter start 
+        potentially having the chapter IDR point one frame later than the chapter start
         timecode.
         """
         # Calculate the scalar value for fps change first
         inverse_source_fps = Fraction(self.__fps_den, self.__fps_num)
         current_fps = Fraction(vid.fps_num, vid.fps_den)
         scalar = inverse_source_fps * current_fps
-        
+
         # Now update it for the chapter timecodes
         self.__fps_num = current_fps.numerator
         self.__fps_den = current_fps.denominator
-        
+
         f = [x.num_frames * scalar for x in self.__clip_holder]
         f2 = [f[0]]
-        for i in range(1,len(f)-1):
+        for i in range(1, len(f) - 1):
             f2.append(f2[i-1]+f[i])
         ch_start_frames = [int(x) for x in f2]
         self.__qp_lines = ' K\n'.join(list(map(str, ch_start_frames))) + ' K\n'
-        ch_start_frames.insert(0,0)
+        ch_start_frames.insert(0, 0)
         i = 1
         ch_string = ""
         names = self.chapter_names
@@ -209,11 +201,11 @@ class AudioCutter(object):
             except IndexError:
                 ch_string += "CHAPTER{0:02d}NAME=Chapter {0:02d}\n".format(i)
             i += 1
-        self.__chapters = ch_string        
-        
+        self.__chapters = ch_string
+
     def write_qpfile(self, outfile):
         """Writes qp_lines to outfile.
-        
+
         Obviously, this is of limited use if you have not run ready_qp_and_chapters(),
         as the default is an empty string, but that operation should succeed.
         """
@@ -221,13 +213,12 @@ class AudioCutter(object):
             with open(outfile, 'w') as o:
                 o.write(self.qp_lines)
         except IOError:
-            print("Error writing to qpfile: {}".format(outfile))
-            raise SystemExit
+            print("Error writing to qpfile: {}".format(outfile), file=sys.stderr)
+            raise
 
-            
     def write_chapters(self, outfile):
         """Writes chapters to outfile.
-        
+
         Obviously, this is of limited use if you have not run ready_qp_and_chapters(),
         as the default is an empty string, but that operation should succeed.
         """
@@ -235,19 +226,18 @@ class AudioCutter(object):
             with open(outfile, 'w') as o:
                 o.write(self.chapters)
         except IOError:
-            print("Error writing to chapter file: {}".format(outfile))
-            raise SystemExit
-            
-    
+            print("Error writing to chapter file: {}".format(outfile), file=sys.stderr)
+            raise
+
     def __merge_adjacent(self):
         """Merges cuts that are a frame apart into a single cut.
-        
+
         This may be unnecessary since this tool requires mkvtoolnix to support split parts,
         but since the standard for cutting appears to be to increment end timecodes by one,
         adjacent start and end times would be identical, and that may not actually yield intended
         results. Or it might. It's honestly not worth testing, given how easy this is.
         """
-        previous = (-3,-3)
+        previous = (-3, -3)
         merged_cuts = []
         for trim in self.__trim_holder:
             if previous[1] + 1 == trim[0]:
@@ -256,13 +246,12 @@ class AudioCutter(object):
                 merged_cuts.append(previous)
                 previous = trim
         merged_cuts.append(previous)
-        merged_cuts.pop(0) # The loop may need that (-3,-3), but the output doesn't
+        merged_cuts.pop(0)  # The loop may need that (-3,-3), but the output doesn't
         return merged_cuts
 
-        
     def __frame_to_timecode(self, fn, msp=False):
         """Takes a frame number and returns a timecode of type HH:MM:SS.nnnnnnnnn
-        
+
         I'm sure nanosecond precision is never, ever useful, but it's better to round
         as late as possible.
         """
@@ -273,14 +262,13 @@ class AudioCutter(object):
         h = m // 60
         m = m % 60
         if msp:
-            return '{:02.0f}:{:02.0f}:{:06.3f}'.format(h, m, round(s,3))
+            return '{:02.0f}:{:02.0f}:{:06.3f}'.format(h, m, round(s, 3))
         else:
             return '{:02.0f}:{:02.0f}:{:012.9f}'.format(h, m, s)
-    
-    
+
     def __list_of_lists(self, trims):
         """Ensures that the trim list is a list of lists.
-        
+
         It does not actually enforce that you use a list of tuples, though that is preferred
         just for stylistic reasons. It also doesn't ensure the data inside the sub-lists is
         valid. This could probably be fixed with duck typing more carefully, but this seemed
@@ -294,35 +282,33 @@ class AudioCutter(object):
                 if (not isinstance(trim, (list, tuple))):
                     return False, "One or more trims is not a list/tuple"
         return True, ""
-    
-    
+
     def __is_valid(self):
         """Ensures that the sub-lists contain two positive integers in ascending order.
-        
+
         Any subclass of numbers.Integral will do here, in case you need something fancier
         than integer literals. Also, having sub-tuples/sub-lists with more than two elements
         is allowed, as long as the first two elements are what is expected.
-        
+
         Note that nothing in the library consumes the remaining elements, even optionally,
         but the process will not end because of their existence.
         """
         for trim in self.__trim_holder:
-            if (not (isinstance(trim[0], numbers.Integral) and 
-                isinstance(trim[1], numbers.Integral))):
+            if (not (isinstance(trim[0], numbers.Integral) and
+                     isinstance(trim[1], numbers.Integral))):
                 return False, "One or more trims is not a group of two integers"
             if ((trim[1] < trim[0]) or (trim[0] < 0)):
                 return False, "One or more trims is either out of order, or negative"
         return True, ""
-    
-    
+
     def __check_ordered(self):
         """Checks whether the first frame of a trim comes strictly after the last of the previous.
-        
-        Out of order cuts are acceptable, and the audio cutting even supports it, unlike 
-        split_aud.pl or vfr.py, but it is more complicated, so not going down that path is 
+
+        Out of order cuts are acceptable, and the audio cutting even supports it, unlike
+        split_aud.pl or vfr.py, but it is more complicated, so not going down that path is
         encouraged if unnecessary.
         """
-        previous = (-3,-3)
+        previous = (-3, -3)
         self.__is_ordered = True
         for trim in self.__trim_holder:
             if (previous[1] > trim[0]):
@@ -331,7 +317,6 @@ class AudioCutter(object):
             previous = trim
         return self.__is_ordered
 
-        
     def __prepare_audio_cut_lines(self, vid):
         self.__check_ordered()
         if self.__is_ordered:
@@ -352,7 +337,6 @@ class AudioCutter(object):
                 cmd += '{} --split parts:{}-{} -o tmp-{:03d}.mka "{{0}}"\n'.format(
                     self.__mkvmerge, s, e, i)
                 i += 1
-            tmpfiles = ' +'.join(['tmp-{:03d}.mka'.format(x) for x in range(1,i)])
+            tmpfiles = ' +'.join(['tmp-{:03d}.mka'.format(x) for x in range(1, i)])
             cmd += '{}  "{}" -o {{1}}'.format(self.__mkvmerge, tmpfiles)
         self.__cut_cmd = cmd
-        
