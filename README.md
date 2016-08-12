@@ -2,12 +2,30 @@
 
 A tool to cut audio and generate associated chapters/qpfiles for vapoursynth.
 
+## Getting Started
+
+### Prerequisites
+- [Python 3](http://python.org) which is actually already a requirement for
+- [Vapoursynth](http://vapoursynth.com) Obviously.
+- [MKVToolNix](https://mkvtoolnix.download) - Needs to be new enough to handle `--split parts:`, though not necessarily up to date
+
+### "Installation"
+
+You can safely put `audiocutter.py` anywhere in your python path, though I recommend creating a `scripts` folder next
+to your plugins32 and plugins64 folders, so you can keep the python in the same vicinity as the the compiled plugins
+you use. You can look at `example.vpy` to see how you can easily leverage this on windows, though the same principle
+applies for Linux/OSX with a different path.
+
+**Note:** Before you leave wherever you're putting the script, check if you can execute `mkvmerge` from your command
+line. If you can't, you should edit `self.__mkvmerge` in `__init__` to match the path to your mkvmerge executable. If
+you're on windows, you should use forward slashes as path delimiters.
+
 ## API
 
 ### Functions
 **\_\_init\_\_(self)**
 
-Bog standard initialization. There are no possible arguments.
+Bog standard initialization. There are no possible arguments. _If mkvmerge isn't in your path, though, this function has the line you need to edit._
 
 **cut\_audio(self, outfile, video\_source=None, audio\_source=None)**
 
@@ -96,4 +114,10 @@ as the default is an empty string, but that operation should succeed.
 >`{0}` for the input filename, and `{1}` for the output. `cut_audio()` handles
 >this for you though.
 
-`qp_lines` - A string containing the lines for a qpfile. Of limited value given `write_qpfile()`
+**qp\_lines** - A string containing the lines for a qpfile. Of limited value given `write_qpfile()`
+
+## Acknowledgments
+
+- [Vfr.py](https://github.com/wiiaboo/vfr) Lifted some of the timecode related code directly from here
+- [split_aud.pl](http://mod16.org/hurfdurf/?p=33) the original big daddy we both descended from for ease of trim->cut audio
+- Some anti-acknowledgments to the writer of vapoursynth's `sam` (Split Audio Module), which appears to have done most of what this code did, but it was only hosted on a pastebin that is now lost to the aether, leading to me having to reinvent this wheel in the first place. I don't believe it handled chapters/qpfiles, so there's at least some novel functionality here, but please, if you're going to create utilities that fill the gap between Avisynth and Vapoursynth, don't let them disappear so easily.
