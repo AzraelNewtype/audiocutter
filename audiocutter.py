@@ -73,13 +73,23 @@ class AudioCutter(object):
         Fancy list slicing, inverse stride, skipping frames, and other similar tricks you can
         trivially pull with vapoursynth directly don't make much sense in this context, so they
         simply will not work.
+
+        Optionally, the user can supply a 3-tuple (or list, it honestly doesn't enforce tuple,
+        with the third element being the chapter name. When done this way, setting chapter_names
+        manually is redundant, though you can override the list with it if you really want to.
+        Either method entirely overrides the other. There is no ability to partially override,
+        so make your decision which way you like it. Any chapter without a name set will enter
+        chapter_names as None, which will render a default name at ready_qp_and_chapters time.
         """
         safe, msg = self.__list_of_lists(trims)
         if (not safe):
             return self.core.text.Text(vid, msg)
         max = vid.num_frames
+        self.chapter_names = list(map(lambda x: x[2] if len(x) > 2 else None,
+                                      trims))
         trims = list(map(lambda x: (x[0], x[1]) if x[1] > 0 else (x[0], max),
-                     trims))
+                         trims))
+
         self.__trim_holder = trims
         valid, msg = self.__is_valid()
         if (not valid):
@@ -167,7 +177,8 @@ class AudioCutter(object):
         The chapters created will be bog standard OGM chapters format, defaulting to
         Chapter NN for the names if chapter_names has not been set. Also, if there are
         more split points than names supplied, it will exhaust the list first and then
-        start using the defaults.
+        start using the defaults. If any of the entries are None or otherwise evaluate
+        to False, it will also use the default.
 
         The chapter timecodes are converted back from the qpfile cut frames, rather than
         separately like vfr.py used to for avisynth, largely because I don't even know
@@ -199,10 +210,14 @@ class AudioCutter(object):
         for chap in ch_start_frames:
             tc = self.__frame_to_timecode(chap, True)
             ch_string += "CHAPTER{0:02d}={1}\n".format(i, tc)
+            fallback_name = "CHAPTER{0:02d}NAME=Chapter {0:02d}\n".format(i)
             try:
-                ch_string += "CHAPTER{0:02d}NAME={1}\n".format(i, names[i-1])
+                if names[i-1]:
+                    ch_string += "CHAPTER{0:02d}NAME={1}\n".format(i, names[i-1])
+                else:
+                    ch_string += fallback_name
             except IndexError:
-                ch_string += "CHAPTER{0:02d}NAME=Chapter {0:02d}\n".format(i)
+                ch_string += fallback_name
             i += 1
         self.__chapters = ch_string
 
