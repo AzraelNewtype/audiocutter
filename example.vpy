@@ -17,7 +17,9 @@ ts_in = core.lsmas.LWLibavSource(ts_file) # any source filter will do
 
 ac = audiocutter.AudioCutter()
 
-vid = ac.split(ts_in, [(1159,6910),(6913,9609),(11862,21298),(23998,34455),(36255,47523),(47524,49711),(49712,50461),(50462,51358)])
+vid = ac.split(ts_in, [(1159,6910, 'A Chapter'),(6913,9609, 'Another Chapter'),
+                       (11862,21298, 'These Names Will be overridden'),(23998,34455),(36255,47523),
+                       (47524,49711, 'By the line below'),(49712,50461),(50462,51358, 'So pick a method')])
 
 ac.chapter_names = ['A List', 'Of Chapter Names', 'That Correspond', 'To The',
                     'Trims Above', 'Unnamed Chapters Become', 'Chapter N+1']
