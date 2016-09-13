@@ -57,7 +57,8 @@ after decimation.
 The chapters created will be bog standard OGM chapters format, defaulting to
 Chapter NN for the names if chapter_names has not been set. Also, if there are
 more split points than names supplied, it will exhaust the list first and then
-start using the defaults.
+start using the defaults. If any of the entries are None or otherwise evaluate
+to False, it will also use the default.
 
 The chapter timecodes are converted back from the qpfile cut frames, rather than
 separately like `vfr.py` used to for avisynth, largely because I don't even know
@@ -85,6 +86,13 @@ Fancy list slicing, inverse stride, skipping frames, and other similar tricks yo
 trivially pull with vapoursynth directly don't make much sense in this context, so they
 simply will not work.
 
+Optionally, the user can supply a 3-tuple (or list, it honestly doesn't enforce tuple,
+with the third element being the chapter name. When done this way, setting chapter_names
+manually is redundant, though you can override the list with it if you really want to.
+Either method entirely overrides the other. There is no ability to partially override,
+so make your decision which way you like it. Any chapter without a name set will enter
+`chapter_names` as `None`, which will render a default name at `ready_qp_and_chapters` time.
+
 **write_chapters(self, outfile)**
 
 Writes chapters to outfile.
@@ -100,7 +108,8 @@ Obviously, this is of limited use if you have not run `ready_qp_and_chapters()`,
 as the default is an empty string, but that operation should succeed.
 
 ### Instance variables
-**chapter\_names** - The list of names to populate the NAME field in your chapters file. Optional
+**chapter\_names** - The list of names to populate the NAME field in your chapters file. Optional, and can be set
+by simply adding the names to the tuples passed to split.
 
 **chapters** - A string containing the lines for a chapter file. Of limited value given `write_chapters()`
 
