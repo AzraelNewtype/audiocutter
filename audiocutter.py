@@ -60,7 +60,7 @@ class AudioCutter(object):
     def qp_lines(self):
         return self.__qp_lines
 
-    def split(self, vid, trims):
+    def split(self, vid, trims, doublecheck=False):
         """Takes a list of 2-tuples of frame numbers and returns the trimmed/spliced video.
 
         The 2-tuples must have positive frame numbers, and the second member must be greater
@@ -94,12 +94,39 @@ class AudioCutter(object):
         valid, msg = self.__is_valid()
         if (not valid):
             return self.core.text.Text(vid, msg)
-        for clip in self.__trim_holder:
-            self.__clip_holder.append(vid[clip[0]:clip[1]+1])
-        self.__fps_num = vid.fps_num
-        self.__fps_den = vid.fps_den
 
-        self.__prepare_audio_cut_lines(vid)
+        if doublecheck:
+            cut_counter = 0
+            for clip in self.__trim_holder:
+                if clip[0] > 0:
+                    c = self.core.std.StackHorizontal([vid[clip[0]-1], vid[clip[0]], vid[clip[0]+1]])
+                else:
+                    c = self.core.std.StackHorizontal([vid[clip[0]], vid[clip[0]+1]])
+                if self.chapter_names[cut_counter]:
+                    cut_name = self.chapter_names[cut_counter] + " Start"
+                else:
+                    cut_name = "Cut {} Start".format(cut_counter)
+                c = self.core.text.Text(c, cut_name, 5)
+                self.__clip_holder.append(c)
+
+                if clip[1] < max:
+                    c = self.core.std.StackHorizontal([vid[clip[1]-1], vid[clip[1]], vid[clip[1]+1]])
+                else:
+                    c = self.core.std.StackHorizontal([vid[clip[1]-1], vid[clip[1]]])
+                if self.chapter_names[cut_counter]:
+                    cut_name = self.chapter_names[cut_counter] + " End"
+                else:
+                    cut_name = "Cut {} End".format(cut_counter)
+                c = self.core.text.Text(c, cut_name, 5)
+                self.__clip_holder.append(c)
+                cut_counter += 1
+        else:
+            for clip in self.__trim_holder:
+                self.__clip_holder.append(vid[clip[0]:clip[1]+1])
+            self.__fps_num = vid.fps_num
+            self.__fps_den = vid.fps_den
+
+            self.__prepare_audio_cut_lines(vid)
 
         return self.core.std.Splice(self.__clip_holder)
 
@@ -165,6 +192,7 @@ class AudioCutter(object):
         if cutExec == 1:
             print("Mkvmerge exited with warnings: {0:d}".format(cutExec))
         elif cutExec == 2:
+            #print(args)
             exit("Failed to execute mkvmerge: {0:d}".format(cutExec))
 
     def ready_qp_and_chapters(self, vid):
