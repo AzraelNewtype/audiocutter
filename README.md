@@ -68,7 +68,7 @@ frame accurate in an ivtc context, having them match and be off by one is better
 potentially having the chapter IDR point one frame later than the chapter start 
 timecode.
 
-**split(self, vid, trims)**
+**split(self, vid, trims[, doublecheck=False])**
 
 Takes a list of 2-tuples of frame numbers and returns the trimmed/spliced video.
 
@@ -92,6 +92,12 @@ manually is redundant, though you can override the list with it if you really wa
 Either method entirely overrides the other. There is no ability to partially override,
 so make your decision which way you like it. Any chapter without a name set will enter
 `chapter_names` as `None`, which will render a default name at `ready_qp_and_chapters` time.
+
+If you desire a quick view of your cut points without commenting the `split()` call out and
+manually checking numbers, set `doublecheck=True`. There each start/end frame from the supplied
+list will be sandwiched with the frames that come before/after them, and labeled with the chapter
+name if given. Using this, you can ensure that you're starting a cut after the commercials or
+whatever are over, and ending before a new set starts, just for example.
 
 **write_chapters(self, outfile)**
 
