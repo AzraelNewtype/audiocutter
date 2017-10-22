@@ -185,14 +185,17 @@ class AudioCutter(object):
         if sbr:
             final_cut += " --aac-is-sbr {}".format(sbr)
 
+        final_cut += ' -o {1} "{0}"'
+
         self.__cut_cmd = final_cut
+
         args = shlex.split(final_cut.format(afile, outfile))
 
         cutExec = call(args)
         if cutExec == 1:
             print("Mkvmerge exited with warnings: {0:d}".format(cutExec))
         elif cutExec == 2:
-            #print(args)
+            print(args)
             exit("Failed to execute mkvmerge: {0:d}".format(cutExec))
 
     def ready_qp_and_chapters(self, vid):
@@ -373,7 +376,6 @@ class AudioCutter(object):
                 e = self.__frame_to_timecode(trim[1]+1)
                 cmd += "{}-{},+".format(s,e)
             cmd = cmd[:-2]
-            cmd += ' -o {1} "{0}"'
         else:
             cmd = ""
             i = 1
