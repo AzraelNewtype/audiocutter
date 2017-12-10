@@ -58,9 +58,16 @@ class AudioCutter(object):
 
     @property
     def qp_lines(self):
+        """Returns the lines that would be output to a qpfile."""
         return self.__qp_lines
-
-    def split(self, vid, trims, doublecheck=False):
+        
+    def get_segment(self, idx):
+        return self.__clip_holder[idx]
+    
+    def write_segment(self, idx, new_segment):
+        self.__clip_holder[idx] = new_segment
+     
+    def split(self, vid, trims, doublecheck=False, join=True):
         """Takes a list of 2-tuples of frame numbers and returns the trimmed/spliced video.
 
         The 2-tuples must have positive frame numbers, and the second member must be greater
@@ -80,6 +87,16 @@ class AudioCutter(object):
         Either method entirely overrides the other. There is no ability to partially override,
         so make your decision which way you like it. Any chapter without a name set will enter
         chapter_names as None, which will render a default name at ready_qp_and_chapters time.
+        
+        If doublecheck is True, the filter will return a series of three frame tryptichs, with
+        each being the first frame of a cut flanked by the previous/next frames, and then the last
+        frame of a cut in the same way. This feature exists to safeguard against mistyping frame
+        numbers.
+        
+        If join is set to true, it will join the segments immediately. If it is not, the segments
+        will remain in their array, waiting for you to process further. This would allow you to perform
+        per-segment filtering, such as fancy IVTC tricks. Also, by allowing IVTC to be performed before
+        joining, there shouldn't be any estimation of frame count changes for chapters.
         """
         safe, msg = self.__list_of_lists(trims)
         if (not safe):
@@ -127,9 +144,22 @@ class AudioCutter(object):
             self.__fps_den = vid.fps_den
 
             self.__prepare_audio_cut_lines(vid)
-
+        
+        if join:
+            return self.core.std.Splice(self.__clip_holder)
+        else:
+            return self.core.text.Text(self.__clip_holder[0], "Not joining, so only returning the "
+                                                                   "first segment with this message.", 5)
+    
+    def join(self, update_framerate=False):
+        # If you're using the delayed join to ivtc per-segment, you can force it to update your
+        # framerate here. It grabs the new rate from the first segment, so I hope you're not
+        # trying to be cute with VFR
+        if update_framerate:
+            self.__fps_num = self.__clip_holder[0].fps_num
+            self.__fps_den = self.__clip_holder[0].fps_den
         return self.core.std.Splice(self.__clip_holder)
-
+                                                                   
     def cut_audio(self, outfile, video_source=None, audio_source=None):
         """Cuts the supplied audio file, based on trims from AudioCutter.split()
 
