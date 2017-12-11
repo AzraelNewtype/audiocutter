@@ -68,7 +68,7 @@ frame accurate in an ivtc context, having them match and be off by one is better
 potentially having the chapter IDR point one frame later than the chapter start 
 timecode.
 
-**split(self, vid, trims[, doublecheck=False])**
+**split(self, vid, trims[, doublecheck=False, join=True])**
 
 Takes a list of 2-tuples of frame numbers and returns the trimmed/spliced video.
 
@@ -99,6 +99,23 @@ list will be sandwiched with the frames that come before/after them, and labeled
 name if given. Using this, you can ensure that you're starting a cut after the commercials or
 whatever are over, and ending before a new set starts, just for example.
 
+If join is set to true, it will join the segments immediately. If it is not, the segments
+will remain in their array, waiting for you to process further. This would allow you to perform
+per-segment filtering, such as fancy IVTC tricks. Also, by allowing IVTC to be performed before
+joining, there shouldn't be any estimation of frame count changes for chapters.
+
+**join(self[, update_framerate=False])**
+
+Joins a delayed split.
+
+As this allows per-segment filtering rather than scene filtering, it is probably only
+really useful for IVTC pattern changes. If you are performing IVTC before joining, you
+probably want to set update_framerate to True here. Doing so will take __clip_holder[0]'s
+framerate and update the internal holders to it, so that ready_qp_and_chapters() multiplies
+in a 1 at framerate scale time, rather than adjusting to the decimated rate.
+
+This won't work with vfr, but I'm not sure the chapters would even with default handling.
+
 **write_chapters(self, outfile)**
 
 Writes chapters to outfile.
@@ -112,6 +129,14 @@ Writes qp_lines to outfile.
 
 Obviously, this is of limited use if you have not run `ready_qp_and_chapters()`,
 as the default is an empty string, but that operation should succeed.
+
+***get_segment(self, idx)***
+
+Returns the split segment at index `idx`. Allows filtering prior to joining.
+    
+***write_segment(self, idx, new_segment)***
+        
+Overwrites the split segment at index `idx` with a clip supplied to `new_segment`. Allows filtering prior to joining.
 
 ### Instance variables
 **chapter\_names** - The list of names to populate the NAME field in your chapters file. Optional, and can be set
