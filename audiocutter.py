@@ -211,21 +211,35 @@ class AudioCutter(object):
 
         final_cut = self.__cut_cmd
         if delay:
-            final_cut += " --sync {}".format(delay)
+            delay_statement = " --sync {}".format(delay)
+        else:
+            delay_statement = ''
+            
         if sbr:
             final_cut += " --aac-is-sbr {}".format(sbr)
 
-        final_cut += ' -o {1} "{0}"'
+        
 
-        self.__cut_cmd = final_cut
+        if self.__is_ordered:
+            final_cut += ' -o {1} "{0}"'
 
-        args = shlex.split(final_cut.format(afile, outfile))
+            self.__cut_cmd = final_cut
+            args = shlex.split(final_cut.format(afile, outfile, delay_statement))
+            cutExec = call(args)
+        else:
+            final_cut = final_cut.format(afile,outfile, delay_statement)
+            cmds = final_cut.split('\n')
+            for cmd in cmds:
+                print(cmd)
+                args = shlex.split(cmd)
+                cutExec = call(args)
+                
 
-        cutExec = call(args)
         if cutExec == 1:
             print("Mkvmerge exited with warnings: {0:d}".format(cutExec))
         elif cutExec == 2:
             print(args)
+            # print(self.__cut_cmd)
             exit("Failed to execute mkvmerge: {0:d}".format(cutExec))
 
     def ready_qp_and_chapters(self, vid):
@@ -399,7 +413,7 @@ class AudioCutter(object):
     def __prepare_audio_cut_lines(self, vid):
         self.__check_ordered()
         if self.__is_ordered:
-            cmd = self.__mkvmerge + " --split parts:"
+            cmd = self.__mkvmerge + "{{2}} --split parts:"
             merged_cuts = self.__merge_adjacent()
             for trim in merged_cuts:
                 s = self.__frame_to_timecode(trim[0])
@@ -412,9 +426,11 @@ class AudioCutter(object):
             for trim in self.__trim_holder:
                 s = self.__frame_to_timecode(trim[0])
                 e = self.__frame_to_timecode(trim[1]+1)
-                cmd += '{} --split parts:{}-{} -o tmp-{:03d}.mka "{{0}}"\n'.format(
+                cmd += '"{}" {{2}} --split parts:{}-{} -o tmp-{:03d}.mka "{{0}}"\n'.format(
                     self.__mkvmerge, s, e, i)
                 i += 1
-            tmpfiles = ' +'.join(['tmp-{:03d}.mka'.format(x) for x in range(1, i)])
-            cmd += '{}  "{}" -o {{1}}'.format(self.__mkvmerge, tmpfiles)
+            tmpfiles = '" ")" + "(" "'.join(['tmp-{:03d}.mka'.format(x) for x in range(1, i)])
+            cmd += '"{}"  "(" "{}" ")" -o "{{1}}"'.format(self.__mkvmerge, tmpfiles)
+            appends = ','.join(['{}:0:{}:0'.format(x+1, x) for x in range(i-2)]) # filenames I 1 indexed, which adds an off-by-one
+            cmd += ' --append-to {}'.format(appends)
         self.__cut_cmd = cmd
