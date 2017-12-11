@@ -152,9 +152,16 @@ class AudioCutter(object):
                                                                    "first segment with this message.", 5)
     
     def join(self, update_framerate=False):
-        # If you're using the delayed join to ivtc per-segment, you can force it to update your
-        # framerate here. It grabs the new rate from the first segment, so I hope you're not
-        # trying to be cute with VFR
+        """Joins a delayed split.
+        
+        As this allows per-segment filtering rather than scene filtering, it is probably only
+        really useful for IVTC pattern changes. If you are performing IVTC before joining, you
+        probably want to set update_framerate to True here. Doing so will take __clip_holder[0]'s
+        framerate and update the internal holders to it, so that ready_qp_and_chapters() multiplies
+        in a 1 at framerate scale time, rather than adjusting to the decimated rate.
+        
+        This won't work with vfr, but I'm not sure the chapters would even with default handling.
+        """
         if update_framerate:
             self.__fps_num = self.__clip_holder[0].fps_num
             self.__fps_den = self.__clip_holder[0].fps_den
