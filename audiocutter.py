@@ -225,7 +225,6 @@ class AudioCutter(object):
             delay_statement = " --sync {}".format(delay)
         else:
             delay_statement = ''
-            
         if sbr:
             final_cut += " --aac-is-sbr {}".format(sbr)
 
@@ -424,7 +423,7 @@ class AudioCutter(object):
     def __prepare_audio_cut_lines(self, vid):
         self.__check_ordered()
         if self.__is_ordered:
-            cmd = self.__mkvmerge + "{{2}} --split parts:"
+            cmd = self.__mkvmerge + "{2} --split parts:"
             merged_cuts = self.__merge_adjacent()
             for trim in merged_cuts:
                 s = self.__frame_to_timecode(trim[0])
