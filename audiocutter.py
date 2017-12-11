@@ -141,7 +141,7 @@ class AudioCutter(object):
             i = 0
             for clip in self.__trim_holder:
                 clp = vid[clip[0]:clip[1]+1]
-                clp = self.core.std.SetFrameProp(clp, prop="_SegmentIdx", intval=i)
+                clp = self.core.std.SetFrameProp(clp, prop="SegmentIdx", intval=i)
                 i += 1
                 self.__clip_holder.append(clp)
             self.__fps_num = vid.fps_num
