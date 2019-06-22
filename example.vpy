@@ -47,6 +47,10 @@ if __name__ == "__main__":
     # In case the description of video_source in the docs seems confusing,
     # this example should show why I'm into it. Doing the whole thing without
     # updating any filenames but the one input stream. Glorious.
-    ac.cut_audio(prefix + '_aud_ac.mka', video_source=ts_file)
-    ac.write_qpfile(prefix + "-vsac.qpfile")
-    ac.write_chapters(prefix + "-vsac-ch.txt")
+    #
+    # The example aac_is_sbr=False is redundant as this is the default state
+    # when unspecified, but calling attention to the argument in the example
+    # seems warranted.
+    ac.cut_audio(prefix + '_aud_ac.mka', video_source=ts_file, aac_is_sbr=False)
+    ac.write_qpfile(prefix + ".qpfile")
+    ac.write_chapters(prefix + "ch.txt")

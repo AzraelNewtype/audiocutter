@@ -27,7 +27,7 @@ you're on windows, you should use forward slashes as path delimiters.
 
 Bog standard initialization. There are no possible arguments. _If mkvmerge isn't in your path, though, this function has the line you need to edit._
 
-**cut\_audio(self, outfile, video\_source=None, audio\_source=None)**
+**cut\_audio(self, outfile, video\_source=None, audio\_source=None, aac_is_sbr=False)**
 
 Cuts the supplied audio file, based on trims from AudioCutter.split()
 
@@ -43,6 +43,12 @@ exclusive with audio_source.
 
 `audio_source` simply takes an audio file name, in case your audio isn't so strictly named
 like your video. This is mutually exclusive with video_source.
+
+`aac_is_sbr` should be set to true if your audio file is an he-aac file that is using spectral
+band replication sbr. Older versions of audiocutter and its predecessor split_aud.pl checked
+automatically using mkvmerge's `--identify-for-mmg`, but that is gone and the replacement is 
+much too complex for auto-setting a single boolean that is almost never True. If you don't know
+if your aac is a low bitrate HE-AAC/AAC+ with SBR, it probably isn't.
 
 `outfile` should be fairly straightforward.
 

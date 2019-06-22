@@ -16,7 +16,7 @@ class AudioCutter(object):
 
         # Easy, top of file spot for mkvmerge path. If the binary isn't in your PATH, edit
         # it here.
-        self.__mkvmerge = r'mkvmerge'
+        self.__mkvmerge = r'C:/Program Files/MKVtoolnix/mkvmerge.exe'
         self.core = vs.get_core()
         self.__trim_holder = []
         self.__clip_holder = []
@@ -66,6 +66,9 @@ class AudioCutter(object):
     
     def write_segment(self, idx, new_segment):
         self.__clip_holder[idx] = new_segment
+        
+    def segment_count(self):
+        return len(self.__clip_holder)
      
     def split(self, vid, trims, doublecheck=False, join=True):
         """Takes a list of 2-tuples of frame numbers and returns the trimmed/spliced video.
@@ -101,7 +104,7 @@ class AudioCutter(object):
         safe, msg = self.__list_of_lists(trims)
         if (not safe):
             return self.core.text.Text(vid, msg)
-        max = vid.num_frames
+        max = vid.num_frames - 1
         self.chapter_names = list(map(lambda x: x[2] if len(x) > 2 else None,
                                       trims))
         trims = list(map(lambda x: (x[0], x[1]) if x[1] > 0 else (x[0], max),
@@ -118,7 +121,8 @@ class AudioCutter(object):
                 if clip[0] > 0:
                     c = self.core.std.StackHorizontal([vid[clip[0]-1], vid[clip[0]], vid[clip[0]+1]])
                 else:
-                    c = self.core.std.StackHorizontal([vid[clip[0]], vid[clip[0]+1]])
+                    bc = self.core.std.BlankClip(vid, length=1).text.Text('This is Fake Frame -1', 6)
+                    c = self.core.std.StackHorizontal([bc, vid[clip[0]], vid[clip[0]+1]])
                 if self.chapter_names[cut_counter]:
                     cut_name = self.chapter_names[cut_counter] + " Start"
                 else:
@@ -129,7 +133,8 @@ class AudioCutter(object):
                 if clip[1] < max:
                     c = self.core.std.StackHorizontal([vid[clip[1]-1], vid[clip[1]], vid[clip[1]+1]])
                 else:
-                    c = self.core.std.StackHorizontal([vid[clip[1]-1], vid[clip[1]]])
+                    bc = self.core.std.BlankClip(vid, length=1).text.Text('This is Fake Frame len+1', 4)
+                    c = self.core.std.StackHorizontal([vid[clip[1]-1], vid[clip[1]], bc])
                 if self.chapter_names[cut_counter]:
                     cut_name = self.chapter_names[cut_counter] + " End"
                 else:
@@ -171,7 +176,7 @@ class AudioCutter(object):
             self.__fps_den = self.__clip_holder[0].fps_den
         return self.core.std.Splice(self.__clip_holder)
                                                                    
-    def cut_audio(self, outfile, video_source=None, audio_source=None):
+    def cut_audio(self, outfile, video_source=None, audio_source=None, aac_is_sbr=False):
         """Cuts the supplied audio file, based on trims from AudioCutter.split()
 
         video_source is intended for use with a video type where you've either manually
@@ -186,6 +191,12 @@ class AudioCutter(object):
 
         audio_source simply takes an audio file name, in case your audio isn't so strictly named
         like your video. This is mutually exclusive with video_source.
+        
+        aac_is_sbr should be set to true if your audio file is an he-aac file that is using spectral
+        band replication sbr. Older versions of audiocutter and its predecessor split_aud.pl checked
+        automatically using mkvmerge's --identify-for-mmg, but that is gone and the replacement is 
+        much too complex for auto-setting a single boolean that is almost never True. If you don't know
+        if your aac is a low bitrate HE-AAC/AAC+ with SBR, it probably isn't.
 
         outfile should be fairly straightforward.
         """
@@ -198,8 +209,17 @@ class AudioCutter(object):
         elif video_source is None:
             afile = audio_source
         else:
-            aacs = glob.glob("{0}*.aac".format(splitext(video_source)[0]))
-            ac3s = glob.glob("{0}*.ac3".format(splitext(video_source)[0]))
+            raw_name = splitext(video_source)[0]
+            if '[' in raw_name or ']' in raw_name:
+                import string, random
+                safe_set = list(set(string.printable) - set(raw_name))
+                guard = random.choice(safe_set)
+                raw_name = raw_name.replace('[', guard)
+                raw_name = raw_name.replace(']', '[]]')
+                raw_name = raw_name.replace(guard, '[[]')
+
+            aacs = glob.glob("{0}*.aac".format(raw_name))
+            ac3s = glob.glob("{0}*.ac3".format(raw_name))
             potential_audio = aacs + ac3s
             potential_audio.sort(key=lambda x: getsize(x), reverse=True)
             if len(potential_audio) > 0:
@@ -207,13 +227,10 @@ class AudioCutter(object):
             else:
                 sys.exit('Cannot find audio file that matches given video file name')
 
-        ident = check_output([self.__mkvmerge, "--identify-for-mmg", afile])
-        identre = re.compile("Track ID (\d+): audio( \(AAC\) \[aac_is_sbr:true\])?")
-        ret = (identre.search(ident.decode(sys.getfilesystemencoding())) if ident
-               else None)
-        tid = ret.group(1) if ret else '0'
-        sbr = ("0:1" if ret.group(2) else "0:0"
-               if afile.endswith("aac") else "")
+        if afile.endswith('aac') and aac_is_sbr:
+            sbr = "0:1"
+        else:
+            sbr = None
 
         delre = re.compile('DELAY ([-]?\d+)', flags=re.IGNORECASE)
         ret = delre.search(afile)
@@ -249,7 +266,6 @@ class AudioCutter(object):
             print("Mkvmerge exited with warnings: {0:d}".format(cutExec))
         elif cutExec == 2:
             print(args)
-            # print(self.__cut_cmd)
             exit("Failed to execute mkvmerge: {0:d}".format(cutExec))
 
     def ready_qp_and_chapters(self, vid):
