@@ -232,6 +232,10 @@ class AudioCutter(object):
         else:
             sbr = None
 
+        ident = check_output([self.__mkvmerge, "--identify", afile])
+        identre = re.compile("Track ID (\d+): audio")
+        ret = (identre.search(ident.decode(sys.getfilesystemencoding())) if ident else None)
+        tid = ret.group(1) if ret else '0'
         delre = re.compile('DELAY ([-]?\d+)', flags=re.IGNORECASE)
         ret = delre.search(afile)
 
